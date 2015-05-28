@@ -4,6 +4,8 @@
   (:export start-server))
 (in-package :web-arena)
 
+(defparameter *user* nil)
+
 (defclass chat-room (hunchensocket:websocket-resource)
   ((name :initarg :name
 	 :initform (error "Name this room!")
@@ -129,7 +131,7 @@
   nil)
 
 (defun send-status (user history)
-  (warn (format nil "~A's form name is ~A~%" (engine:name user) (engine:form-name user)))
+;  (warn (format nil "~A's form name is ~A~%" (engine:name user) (engine:form-name user)))
   (let* ((hash (make-hash-table))
 	 (json-hash (cl-json:encode-json-to-string 
 		     (progn (setf (gethash 'status hash) `(("current_form" . ,(engine:form-name user))
@@ -150,69 +152,66 @@
 ;    (warn "Outputting stats: ~A" json-hash)
     (engine:output json-hash)))
 
-(defmacro setup-user-output (user)
-; TODO: this needs to handle init as well as a turn's worth of events
-; TODO: currently assumes a single opponent
-  `(progn (defmethod event-message ((eventlist list))
+(defmethod event-message ((eventlist list))
 ;	    (warn (format nil "Oh noes! Event list is ~A!~%" eventlist))
-	    (cond ((equal eventlist (list nil)) nil)
-		  ((every #'(lambda (x) (and (not (atom x))
-					     (cdr x) 
-					     (atom (cdr x)))) eventlist)
-		   (let ((init-winner (caar eventlist))
-			 (opponent (car (remove ,user (mapcar #'car eventlist)))))
+  (when (and eventlist *user*)
+    (cond ((equal eventlist (list nil)) nil)
+	  ((every #'(lambda (x) (and (not (atom x))
+				     (cdr x) 
+				     (atom (cdr x)))) eventlist)
+	   (let ((init-winner (caar eventlist))
+		 (opponent (car (remove *user* (mapcar #'car eventlist)))))
 ;		     (warn (format nil "Opponent: ~A~%" opponent))
-		     (format nil "Combat with ~A the ~A begins. ~A initiative."
-			     (engine:name opponent)
-			     (string-capitalize (engine:form-name opponent))
-			     (if (equal init-winner ,user)
-				 "You win"
-				 (format nil "~A wins" (engine:name opponent))))))
-		  (t (let* ((events-this-turn (reverse (engine:this-turn-events eventlist)))
-			    (messagelist (remove nil 
-						 (maplist #'(lambda (list) 
-							      (let ((event (car list))
-								    (rest (cdr list)))
-								(cond ((or (typep event 'engine:hit)
-									   (typep event 'engine:crit))
-								       (let ((damage (find-if #'(lambda (x) (and (typep x 'engine:damage-taken)
-														 (equal (engine:source x) event)))
-											      rest)))
-									 (format nil "~A~A" 
-										 (event-message event) 
-										 (event-message damage))))
-								      ((and (typep event 'engine:damage-taken)
-									    (typep (engine:source event) 'engine:hit))
-								       nil)
-								      (t (event-message event)))))
-							      events-this-turn)))
-			    (message (format nil "~{~A~^ ~}" messagelist)))
+	     (format nil "Combat with ~A the ~A begins. ~A initiative."
+		     (engine:name opponent)
+		     (string-capitalize (engine:form-name opponent))
+		     (if (equal init-winner *user*)
+			 "You win"
+			 (format nil "~A wins" (engine:name opponent))))))
+	  (t (let* ((events-this-turn (reverse (engine:this-turn-events eventlist)))
+		    (messagelist (remove nil 
+					 (maplist #'(lambda (list) 
+						      (let ((event (car list))
+							    (rest (cdr list)))
+							(cond ((or (typep event 'engine:hit)
+								   (typep event 'engine:crit))
+							       (let ((damage (find-if #'(lambda (x) (and (typep x 'engine:damage-taken)
+													 (equal (engine:source x) event)))
+										      rest)))
+								 (format nil "~A~A" 
+									 (event-message event) 
+									 (event-message damage))))
+							      ((and (typep event 'engine:damage-taken)
+								    (typep (engine:source event) 'engine:hit))
+							       nil)
+							      (t (event-message event)))))
+						  events-this-turn)))
+		    (message (format nil "~{~A~^ ~}" messagelist)))
 ;		       (warn (format nil "~A" messagelist))
 ;							     (mapcar #'event-message 
 ;								     (engine:this-turn-events eventlist)))))))
-		       (send-status ,user eventlist)
-		       (send-stats ,user)
+	       (send-status *user* eventlist)
+	       (send-stats *user*)
 ;		       (warn message)
-		       (format nil 
-			       "~A~A" 
-			       message 
-			       (let ((lastchar (elt message (1- (length message)))))
-				 (if (not (some #'(lambda (x) (equal lastchar x)) '(#\. #\! #\?)))
-				     "."
-				     "")))))))
-	  (defmethod engine:output (message)
-;	    (warn (format nil "Outputting message: ~A~%" message))
-;	    (warn (format nil "Applicable methods for type ~A: ~A~%" (type-of message)
-;			  (compute-applicable-methods #'event-message (list message))))
-	    (when message 
-	      (hunchensocket:send-text-message ,user (event-message message))))))
+	       (format nil 
+		       "~A~A" 
+		       message 
+		       (let ((lastchar (elt message (1- (length message)))))
+			 (if (not (some #'(lambda (x) (equal lastchar x)) '(#\. #\! #\?)))
+			     "."
+			     ""))))))))
 
-(defmethod initialize-instance :after ((it web-player) &rest args)
-  (declare (ignore args))
-  (setup-user-output it))
+(defmethod engine:output (message)
+  (when (and message *user*)
+    (hunchensocket:send-text-message *user* (event-message message))))
+
+(defmacro with-user-output (user &body body)
+; TODO: currently assumes a single opponent
+  `(let* ((*user* ,user))
+     ,@body))
 
 (defmethod pf-arena:update-form ((it web-player) newform)
-  (warn "Form updated.")
+;  (warn "Form updated.")
   (pf-arena:change-form it newform 'web-player)
   (send-status it nil)
   (send-stats it))
@@ -298,11 +297,13 @@
         do (hunchensocket:send-text-message peer (apply #'format nil message args))))
 
 (defmethod hunchensocket:client-connected ((room chat-room) user)
-  (loop do (run-game user) ; TODO: Needs an unwind-protect with a save-game
-           (broadcast room 
-		      "{\"news\":\"~A has died after reaching the level of ~A.\"}" 
-		      (engine:name user) 
-		      (engine:form-name user))))
+  (with-user-output user
+    (engine:output "Initializing, please wait...")
+    (loop do (run-game user) ; TODO: Needs an unwind-protect with a save-game
+	 (broadcast room 
+		    "{\"news\":\"~A has died after reaching the level of ~A.\"}" 
+		    (engine:name user) 
+		    (engine:form-name user)))))
 
 (defmethod hunchensocket:client-disconnected ((room chat-room) user)
   (when (engine:name user) 
@@ -318,5 +319,5 @@
 			       :port (or port 8887) 
 			       :read-timeout 60 
 			       :write-timeout 60)))
-    (hunchentoot:start *server*)
+    (hunchentoot:start server)
     server))

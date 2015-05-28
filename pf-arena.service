@@ -4,10 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=htoot
-Group=htoot
 ExecStart=/home/olad/progs/cl/web-arena/run-arena
-ExecStop=telnet localhost 6440
+ExecStop=/usr/bin/telnet localhost 6440
 Restart=on-failure
 
 TimeoutSec=300

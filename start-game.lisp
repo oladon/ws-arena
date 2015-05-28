@@ -25,7 +25,7 @@
 (defparameter *server* ())
 (defparameter *shutdown-port* 6440)
 (defparameter *swank-loader*
-  "~/quicklisp/dists/quicklisp/software/slime-2.13/swank-loader.lisp")
+  "/home/olad/quicklisp/dists/quicklisp/software/slime-2.13/swank-loader.lisp")
 (defparameter *swank-port* 4006)
 
 (defun game-setup ()
