@@ -298,16 +298,15 @@
 
 (defmethod hunchensocket:client-connected ((room chat-room) user)
   (with-user-output user
-    (engine:output "Initializing, please wait...")
     (loop do (run-game user) ; TODO: Needs an unwind-protect with a save-game
 	 (broadcast room 
 		    "{\"news\":\"~A has died after reaching the level of ~A.\"}" 
 		    (engine:name user) 
 		    (engine:form-name user)))))
 
-(defmethod hunchensocket:client-disconnected ((room chat-room) user)
-  (when (engine:name user) 
-    (broadcast room "~A has left ~A" (engine:name user) (name room))))
+;(defmethod hunchensocket:client-disconnected ((room chat-room) user)
+;  (when (engine:name user) 
+;    (broadcast room "~A has left ~A" (engine:name user) (name room))))
 
 (defmethod hunchensocket:text-message-received ((room chat-room) user message)
 ;  (when (engine:name user)
