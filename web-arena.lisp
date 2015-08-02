@@ -12,12 +12,8 @@
 	 :reader name))
   (:default-initargs :client-class 'web-player))
 
-;(defclass user (hunchensocket:websocket-client)
-;  ((name :initarg :name
-;	 :initform nil
-;	 :accessor name)))
-
-(engine:defgameobject web-player (pf-arena:pfcc-player hunchensocket:websocket-client)
+(engine:defgameobject web-player 
+    (pf-arena:pfcc-player hunchensocket:websocket-client)
   ())
 
 (defclass pfcc-game (hunchensocket:websocket-resource) 
@@ -41,9 +37,6 @@
   (format nil "~A" event))
 
 (defmethod event-message ((event engine:miss))
-;  (warn (format nil "Attacker is ~A, weapon is ~A" 
-;		(engine:attacker event)
-;		(engine:weapon event)))
   (format nil "~A misses with ~A." 
 	  (engine:name (engine:attacker event))
 	  (engine:name (engine:weapon event))))
@@ -250,7 +243,7 @@
 ;		 (warn (format nil "Returning ~A...~%" (nth (parse-integer choice) actions)))
 		 (nth (parse-integer choice) actions))))))
 
-;pretty-print is from the textengine project
+;;; pretty-print is from the textengine project
 (defmethod engine:pretty-print ((it string))
   (format nil "~A" it))
 
@@ -273,20 +266,18 @@
       (setf (engine:name user) username)))
 ;      (engine:output (format nil "Set your name to: ~A" username))))
 ;  (when (not (pf-arena:difficulty user))
-    (let ((choice (engine:select user (mapcar #'car pf-arena:*difficultymap*) :prompt "Select a difficulty.")))
+    (let ((choice (engine:select user 
+				 (mapcar #'car pf-arena:*difficultymap*) 
+				 :prompt "Select a difficulty.")))
       (setf (pf-arena:difficulty user) choice))
 ;      (warn "Test: ~A" (pf-arena:difficulty user))
 ;      (engine:output (format nil "You chose ~A." (engine:pretty-print choice)))))
-    ; TODO: get rid of this on-event once event parsing is done
-;  (engine:on-event engine:hp-changed (when (equal (engine:creature engine:event)
-;						  user)
-;				       (send-status user engine:history)))
-  (setf pf-arena:*pfccmonsters* 
-	(sort (pf-arena:init-monsters 
-	       (copy-list engine:*monsters*)) #'< :key #'car))
-  (pf-arena:update-form user (pf-arena:pick-starting-form pf-arena:*pfccmonsters*))
-  (setf (pf-arena:kills user) nil)
-  (setf (pf-arena:xp-earned user) 0))
+    (setf pf-arena:*pfccmonsters* 
+	  (sort (pf-arena:init-monsters 
+		 (copy-list engine:*monsters*)) #'< :key #'car))
+    (pf-arena:update-form user (pf-arena:pick-starting-form pf-arena:*pfccmonsters*))
+    (setf (pf-arena:kills user) nil)
+    (setf (pf-arena:xp-earned user) 0))
 
 (defun run-game (user)
   (setup-web-game user)
@@ -304,13 +295,7 @@
 		    (engine:name user) 
 		    (engine:form-name user)))))
 
-;(defmethod hunchensocket:client-disconnected ((room chat-room) user)
-;  (when (engine:name user) 
-;    (broadcast room "~A has left ~A" (engine:name user) (name room))))
-
 (defmethod hunchensocket:text-message-received ((room chat-room) user message)
-;  (when (engine:name user)
-;      (broadcast room "~A said: ~A" (engine:name user) message))
   message)
 
 (defun start-server (&optional port)
