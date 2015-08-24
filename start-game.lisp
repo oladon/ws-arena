@@ -1,20 +1,9 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;; start-hunchentoot.lisp
-;;;;
-;;;; Author:  William Bruschi
-;;;; Date:    02-14-2009
-;;;;
-;;;; Starts Hunchentoot and Swank, then listens for a shutdown
-;;;; command on the specified port.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(require 'asdf)
 (require 'cl-json)
 (require 'cl-who)
 (require 'hunchentoot)
 (require 'hunchensocket)
 (require 'sb-bsd-sockets)
-(ql:quickload '(engine pf-arena web-arena))
+(ql:quickload '(engine pf-arena ws-arena))
 
 (defpackage :gameserver
 (:use :common-lisp :hunchentoot :cl-who))
@@ -31,7 +20,7 @@
 (defun game-setup ()
 ;;;; Start the game server
   (setf *server*
-    (web-arena:start-server *game-port*))
+    (ws-arena:start-server *game-port*))
   (princ "Game server started on port ")
   (princ *game-port*) (terpri)
   

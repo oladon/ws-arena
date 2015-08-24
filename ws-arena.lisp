@@ -1,8 +1,8 @@
-(defpackage :web-arena
-  (:use :common-lisp :hunchensocket :cl-json :engine :pf-arena
+(defpackage :ws-arena
+  (:use :common-lisp
 	#+sbcl sb-mop #+clisp clos #+clisp mop)
   (:export start-server))
-(in-package :web-arena)
+(in-package :ws-arena)
 
 (defparameter *user* nil)
 
@@ -62,7 +62,6 @@
 	  (engine:name (engine:defender event))))
 
 (defmethod event-message ((event engine:damage-taken))
-;  (warn (format nil "Damage is ~A" (engine:damage event)))
   (let* ((source (engine:source event))
 	 (creature (engine:creature event))
 	 (name (engine:name creature))
@@ -124,7 +123,6 @@
   nil)
 
 (defun send-status (user history)
-;  (warn (format nil "~A's form name is ~A~%" (engine:name user) (engine:form-name user)))
   (let* ((hash (make-hash-table))
 	 (json-hash (cl-json:encode-json-to-string 
 		     (progn (setf (gethash 'status hash) `(("current_form" . ,(engine:form-name user))
@@ -133,7 +131,6 @@
 							   ("nonlethal" . ,(engine:total-nonlethal-damage user history))
 							   ("ac" . ,(engine:armor-class nil user (car (engine:melee (car engine:*monsters*))) history))))
 			    hash))))
-;    (warn "Outputting: ~A" json-hash)
     (engine:output json-hash)))
 
 (defun send-stats (user)
@@ -142,11 +139,9 @@
 		     (progn (setf (gethash 'stats hash) `(("kills" . ,(pf-arena:kills user))
 							  ("xp_earned" . ,(pf-arena:xp-earned user))))
 			    hash))))
-;    (warn "Outputting stats: ~A" json-hash)
     (engine:output json-hash)))
 
 (defmethod event-message ((eventlist list))
-;	    (warn (format nil "Oh noes! Event list is ~A!~%" eventlist))
   (when (and eventlist *user*)
     (cond ((equal eventlist (list nil)) nil)
 	  ((every #'(lambda (x) (and (not (atom x))
@@ -154,7 +149,6 @@
 				     (atom (cdr x)))) eventlist)
 	   (let ((init-winner (caar eventlist))
 		 (opponent (car (remove *user* (mapcar #'car eventlist)))))
-;		     (warn (format nil "Opponent: ~A~%" opponent))
 	     (format nil "Combat with ~A the ~A begins. ~A initiative."
 		     (engine:name opponent)
 		     (string-capitalize (engine:form-name opponent))
@@ -180,12 +174,8 @@
 							      (t (event-message event)))))
 						  events-this-turn)))
 		    (message (format nil "~{~A~^ ~}" messagelist)))
-;		       (warn (format nil "~A" messagelist))
-;							     (mapcar #'event-message 
-;								     (engine:this-turn-events eventlist)))))))
 	       (send-status *user* eventlist)
 	       (send-stats *user*)
-;		       (warn message)
 	       (format nil 
 		       "~A~A" 
 		       message 
@@ -199,12 +189,11 @@
     (hunchensocket:send-text-message *user* (event-message message))))
 
 (defmacro with-user-output (user &body body)
-; TODO: currently assumes a single opponent
+;; TODO: currently assumes a single opponent
   `(let* ((*user* ,user))
      ,@body))
 
 (defmethod pf-arena:update-form ((it web-player) newform)
-;  (warn "Form updated.")
   (pf-arena:change-form it newform 'web-player)
   (send-status it nil)
   (send-stats it))
@@ -214,7 +203,6 @@
         with valid?
         do (when prompt (engine:output prompt))
            (setf response (hunchensocket:new-read-handle-loop (or resource (car *resources*)) user))
-;           (warn "Test: ~A said ~A (~A)" (engine:name user) response (type-of response))
            (setf valid? (funcall validation response))
            (unless valid? 
 	     (engine:output "Invalid entry.")
@@ -240,7 +228,6 @@
 										(< -1 new-x (length actions)))))
 						  :resource (car *resources*)
 						  :prompt prompt)))
-;		 (warn (format nil "Returning ~A...~%" (nth (parse-integer choice) actions)))
 		 (nth (parse-integer choice) actions))))))
 
 ;;; pretty-print is from the textengine project
@@ -264,14 +251,10 @@
 					 :resource (car *resources*) 
 					 :prompt "{\"textprompt\": \"Enter your name: \"}")))
       (setf (engine:name user) username)))
-;      (engine:output (format nil "Set your name to: ~A" username))))
-;  (when (not (pf-arena:difficulty user))
     (let ((choice (engine:select user 
 				 (mapcar #'car pf-arena:*difficultymap*) 
 				 :prompt "Select a difficulty.")))
       (setf (pf-arena:difficulty user) choice))
-;      (warn "Test: ~A" (pf-arena:difficulty user))
-;      (engine:output (format nil "You chose ~A." (engine:pretty-print choice)))))
     (setf pf-arena:*pfccmonsters* 
 	  (sort (pf-arena:init-monsters 
 		 (copy-list engine:*monsters*)) #'< :key #'car))

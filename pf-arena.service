@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/olad/progs/cl/web-arena/run-arena
+ExecStart=/home/olad/progs/cl/ws-arena/run-arena
 ExecStop=/usr/bin/telnet localhost 6440
 Restart=on-failure
 
